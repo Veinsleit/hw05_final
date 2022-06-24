@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.core.cache import cache
 
 from ..models import Group, Post
 
@@ -29,9 +30,14 @@ class CacheTests(TestCase):
 
     def test_index_cache(self):
         self.authorized_client.get(reverse('posts:index'))
-        self.authorized_client.get(reverse(
-            'posts:post_delete',
-            kwargs={'post_id': self.post.id},
+        Post.objects.filter(id=self.post.id).delete()
+        response_cache = self.authorized_client.get(reverse('posts:index'))
+        self.assertIn(self.post.text.encode(), response_cache.content)
+        cache.clear()
+        response_cache_cleared = self.authorized_client.get(reverse(
+            'posts:index'
         ))
-        response = self.authorized_client.get(reverse('posts:index'))
-        self.assertIn(self.post.text.encode(), response.content)
+        self.assertNotIn(
+            self.post.text.encode(),
+            response_cache_cleared.content
+        )

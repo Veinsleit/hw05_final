@@ -118,11 +118,6 @@ class PostsPagesTests(TestCase):
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
-        # Модуль shutil - библиотека Python с удобными инструментами
-        # для управления файлами и директориями:
-        # создание, удаление, копирование, перемещение,
-        # изменение папок и файлов
-        # Метод shutil.rmtree удаляет директорию и всё её содержимое
         shutil.rmtree(TEMP_MEDIA_ROOT, ignore_errors=True)
 
     def setUp(self):
@@ -248,35 +243,37 @@ class PostsPagesTests(TestCase):
                 response = self.authorized_client.get(page)
                 self.assertIn(self.post, response.context['page_obj'])
 
-    def test_comments_authorized_only(self):
-        form_data_1 = {
-            'text': 'test_comment_1'
+    def test_authorized_can_comment(self):
+        form_data = {
+            'text': 'test_comment'
         }
-        form_data_2 = {
-            'text': 'test_comment_2'
+        self.authorized_client.post(reverse(
+            'posts:add_comment',
+            kwargs={'post_id': self.post.id}
+        ),
+            data=form_data,
+            follow=True
+        )
+        self.assertTrue(
+            self.post.comments.filter(
+                text='test_comment'
+            ).exists()
+        )
+
+    def test_guest_cannot_comment(self):
+        form_data = {
+            'text': 'test_comment'
         }
         self.guest_client.post(reverse(
             'posts:add_comment',
             kwargs={'post_id': self.post.id}
         ),
-            data=form_data_1,
-            follow=True
-        )
-        self.authorized_client.post(reverse(
-            'posts:add_comment',
-            kwargs={'post_id': self.post.id}
-        ),
-            data=form_data_2,
+            data=form_data,
             follow=True
         )
         self.assertFalse(
             self.post.comments.filter(
-                text='test_comment_1'
-            ).exists()
-        )
-        self.assertTrue(
-            self.post.comments.filter(
-                text='test_comment_2'
+                text='test_comment'
             ).exists()
         )
 
@@ -330,6 +327,12 @@ class FollowTests(TestCase):
                 user=self.user_1,
                 author=self.user_2,
             ).exists()
+        )
+
+    def test_user_unfollow_correctly(self):
+        Follow.objects.create(
+            user=self.user_1,
+            author=self.user_2
         )
         self.authorized_client.post(reverse(
             'posts:profile_unfollow',
